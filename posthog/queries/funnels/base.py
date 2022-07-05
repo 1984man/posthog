@@ -244,8 +244,29 @@ class ClickhouseFunnelBase(ABC):
             return self._format_single_funnel(results[0])
 
     def _exec_query(self) -> List[Tuple]:
+        nodes = ["localhost"]
+        agg_result = []
         query = self.get_query()
-        return sync_execute(query, self.params)
+        for node in nodes:
+            result_each = sync_execute(query, self.params)
+            agg_result.extend(result_each)
+        #xxx
+        max_steps = len(self._filter.entities)
+
+
+        final_result_ = [0] * max_steps
+        final_result_.extend([0] * (max_steps-1))
+        final_result_.extend([0] * (max_steps-1))
+        index = len(final_result_)
+        for result_ in agg_result:
+            for i in [i for i in range(index) if i < max_steps]:
+                final_result_[i] += result_[i]
+
+
+
+        final_result = []
+        final_result.append(final_result_)
+        return final_result
 
     def _get_timestamp_outer_select(self) -> str:
         if self._include_preceding_timestamp:

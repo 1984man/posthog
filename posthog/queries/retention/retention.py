@@ -9,7 +9,7 @@ from posthog.queries.retention.actors_query import RetentionActors, RetentionAct
 from posthog.queries.retention.event_query import RetentionEventsQuery
 from posthog.queries.retention.sql import RETENTION_BREAKDOWN_SQL
 from posthog.queries.retention.types import BreakdownValues, CohortKey
-
+from collections import defaultdict
 
 class Retention:
     event_query = RetentionEventsQuery
@@ -27,15 +27,44 @@ class Retention:
             return self.process_table_result(retention_by_breakdown, filter)
 
     def _get_retention_by_breakdown_values(
-        self, filter: RetentionFilter, team: Team,
+            self, filter: RetentionFilter, team: Team,
     ) -> Dict[CohortKey, Dict[str, Any]]:
 
         actor_query = build_actor_activity_query(filter=filter, team=team, retention_events_query=self.event_query)
 
-        result = sync_execute(
-            RETENTION_BREAKDOWN_SQL.format(actor_query=actor_query,),
-            settings={"timeout_before_checking_execution_speed": 60},
-        )
+        nodes = ["localhost"]
+        agg_result = []
+
+        for node in nodes:
+            result_each = sync_execute(
+                RETENTION_BREAKDOWN_SQL.format(actor_query=actor_query, ),
+                settings={"timeout_before_checking_execution_speed": 60},
+            )
+            agg_result.extend(result_each)
+
+        date_with_dup_set = set()
+        group = []
+        for each_result_ in agg_result:
+            date_with_dup_set.add(each_result_[0])
+            group = list(date_with_dup_set)
+        group.sort()
+
+        result_dict = defaultdict(lambda: defaultdict(int))
+        for breakdown in group:
+            for x in agg_result:
+                if (x[0] == breakdown):
+                    result_dict[breakdown][x[1]] += x[2]
+
+        result = []
+        for breakdown in group:
+            items = list(result_dict[breakdown].items())
+            items.sort()
+            for d in result_dict[breakdown]:
+                item = ([breakdown], d, result_dict[breakdown][d])
+                result.append(item)
+
+
+
 
         result_dict = {
             CohortKey(tuple(breakdown_values), intervals_from_base): {
@@ -51,7 +80,7 @@ class Retention:
         return result_dict
 
     def _construct_people_url_for_trend_breakdown_interval(
-        self, filter: RetentionFilter, selected_interval: int, breakdown_values: BreakdownValues,
+            self, filter: RetentionFilter, selected_interval: int, breakdown_values: BreakdownValues,
     ):
         params = RetentionFilter(
             {**filter._data, "breakdown_values": breakdown_values, "selected_interval": selected_interval}
@@ -59,7 +88,7 @@ class Retention:
         return f"{self._base_uri}api/person/retention/?{urlencode(params)}"
 
     def process_breakdown_table_result(
-        self, resultset: Dict[CohortKey, Dict[str, Any]], filter: RetentionFilter,
+            self, resultset: Dict[CohortKey, Dict[str, Any]], filter: RetentionFilter,
     ):
         result = [
             {
@@ -80,7 +109,7 @@ class Retention:
         return result
 
     def process_table_result(
-        self, resultset: Dict[CohortKey, Dict[str, Any]], filter: RetentionFilter,
+            self, resultset: Dict[CohortKey, Dict[str, Any]], filter: RetentionFilter,
     ):
         """
         Constructs a response for the rest api when there is no breakdown specified
@@ -141,11 +170,11 @@ class Retention:
 
 
 def build_returning_event_query(
-    filter: RetentionFilter,
-    team: Team,
-    aggregate_users_by_distinct_id: Optional[bool] = None,
-    using_person_on_events: bool = False,
-    retention_events_query=RetentionEventsQuery,
+        filter: RetentionFilter,
+        team: Team,
+        aggregate_users_by_distinct_id: Optional[bool] = None,
+        using_person_on_events: bool = False,
+        retention_events_query=RetentionEventsQuery,
 ):
     returning_event_query_templated, returning_event_params = retention_events_query(
         filter=filter.with_data({"breakdowns": []}),  # Avoid pulling in breakdown values from returning event query
@@ -161,11 +190,11 @@ def build_returning_event_query(
 
 
 def build_target_event_query(
-    filter: RetentionFilter,
-    team: Team,
-    aggregate_users_by_distinct_id: Optional[bool] = None,
-    using_person_on_events: bool = False,
-    retention_events_query=RetentionEventsQuery,
+        filter: RetentionFilter,
+        team: Team,
+        aggregate_users_by_distinct_id: Optional[bool] = None,
+        using_person_on_events: bool = False,
+        retention_events_query=RetentionEventsQuery,
 ):
     target_event_query_templated, target_event_params = retention_events_query(
         filter=filter,

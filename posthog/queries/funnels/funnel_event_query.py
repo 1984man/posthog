@@ -107,7 +107,7 @@ class FunnelEventQuery(EventQuery):
         self.params.update(groups_params)
 
         query = f"""
-            SELECT {', '.join(_fields)} FROM events {self.EVENT_TABLE_ALIAS}
+            SELECT {', '.join(_fields)} FROM sharded_events {self.EVENT_TABLE_ALIAS}
             {self._get_distinct_id_query()}
             {person_query}
             {groups_query}
