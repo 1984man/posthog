@@ -97,25 +97,25 @@ class RetentionEventsQuery(EventQuery):
             if self._event_query_type == RetentionQueryType.TARGET_FIRST_TIME:
                 _fields += [
                     f"""
-                    [
+                    
                         dateDiff(
                             %(period)s,
                             {self._trunc_func}(toDateTime(%(start_date)s)),
                             {self._trunc_func}(min(e.timestamp))
                         )
-                    ] as breakdown_values
+                     as breakdown_values
                     """
                 ]
             elif self._event_query_type == RetentionQueryType.TARGET:
                 _fields += [
                     f"""
-                    [
+                    
                         dateDiff(
                             %(period)s,
                             {self._trunc_func}(toDateTime(%(start_date)s)),
                             {self._trunc_func}(e.timestamp)
                         )
-                    ] as breakdown_values
+                     as breakdown_values
                     """
                 ]
             self.params.update({"start_date": self._filter.date_from, "period": self._filter.period})
@@ -148,7 +148,7 @@ class RetentionEventsQuery(EventQuery):
         self.params.update(groups_params)
 
         query = f"""
-            SELECT {','.join(_fields)} FROM events {self.EVENT_TABLE_ALIAS}
+            SELECT {','.join(_fields)} FROM sharded_events {self.EVENT_TABLE_ALIAS}
             {self._get_distinct_id_query()}
             {person_query}
             {groups_query}
